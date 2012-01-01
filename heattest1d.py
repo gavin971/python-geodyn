@@ -10,14 +10,14 @@ import numpy
 import matplotlib.pyplot
 
 # Init grids
-N = 50          # no of z-cells
+N = 50           # no of z-cells
 z_max = 20.0     # max depth of z
 dz = z_max/N     # cell width
 z = numpy.arange(N)*dz # cell depths [m]
 T = numpy.empty(N)     # cell temperatures [K]
 
 # Physical parameters
-k = 1.5 # thermal conductivity [W/(kg K)]
+k = 1.5    # thermal conductivity [W/(kg K)]
 rho = 2000 # material density [kg/m^3]
 c_p = 1000 # material specific heat capacity [J/(kg K)]
 A = numpy.ones(N)*1e-6     # cell heat production values [W/m^3], try to change this
@@ -25,15 +25,15 @@ kappa = k/(rho * c_p)      # thermal diffusivity [m^2/s]
 
 # Temporal parameters
 dt = 24.0*60.0*60.0  # time step length [s]
-t = 0.0    # current time
-t_end = 365.0*24.0*60.0*60.0 # end time [s]
+t = 0.0              # current time
+t_end = 10.0*365.0*24.0*60.0*60.0 # end time [s]
 dt_plot = 7.0*24.0*60.0*60.0 # time between plots [s]
 
 # Boundary conditions
-T0mean = 273.15 + 3.0 # mean temperature [K]
-T_s = T0mean # surface temperature [K]
+T0mean = 273.15 - 3.0 # mean temperature [K]
+T_s = T0mean    # surface temperature [K]
 deltaT = 12.0   # amplitude of surface temperature fluctuations [K]
-q_b = 0.065        # heat flux from below [W/m^2]
+q_b = 0.065     # heat flux from below [W/m^2]
 
 # Construct diagonals to the coefficient matrix
 M = numpy.diag(numpy.ones(N)*-2, 0)     # main diagonal
