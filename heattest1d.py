@@ -10,8 +10,8 @@ import numpy
 import matplotlib.pyplot
 
 # Init grids
-N = 30          # no of z-cells
-z_max = 10.0     # max depth of z
+N = 50          # no of z-cells
+z_max = 20.0     # max depth of z
 dz = z_max/N     # cell width
 z = numpy.arange(N)*dz # cell depths [m]
 T = numpy.empty(N)     # cell temperatures [K]
@@ -58,7 +58,8 @@ M = M + numpy.diag(numpy.ones(N-1)*-1.0 * dt*kappa / (dz**2), 1)  # upper diagon
 M = M + numpy.diag(numpy.ones(N-1)*-1.0 * dt*kappa / (dz**2), -1) # lower diagonal
 # enforce BCs
 M[0,0] = 1; M[0,1] = 0          # const. val
-#M[-1,-1] = 1; M[-1,-2] = -1     # const. flux
+M[-1,-1] = -(rho*c_p/dt + 0.5*(2*k)/(dz**2))
+M[-1,-2] = 0.5*(2*k)/(dz**2)
 
 # Create plot
 fig = matplotlib.pyplot.figure(1)
@@ -74,10 +75,10 @@ for i in range(int((t_end-t)/dt)):
 
     # Construct the vector of known terms
     p = T + dt * A / (rho*c_p)
+    p[-1] = -rho * c_p / dt * T[-1] - A[-1] + q_b/dz
 
     # Find the solution to t+dt
     T_new = numpy.dot(numpy.linalg.inv(M), p)
-    T_new[-1] += q_b * dz**2 * dt
 
     # Increment current time, save new values as current
     t += dt
@@ -86,13 +87,14 @@ for i in range(int((t_end-t)/dt)):
 
     if (t_plot >= dt_plot):
         # plot z and T
-        ax.plot(T, z, '-', label='w=' + str(int(t/dt_plot)))
+        ax.plot(T-273.15, z, '-', label='w=' + str(int(t/dt_plot)))
         t_plot = 0
 
 ax.legend()
 ax.set_ylim(ax.get_ylim()[::-1]) # flip y axis
 ax.set_title('Transient temperature')
-ax.set_xlabel('Temperature [K]')
+#ax.set_xlabel('Temperature [K]')
+ax.set_xlabel('Temperature [C]')
 ax.set_ylabel('Depth [m]')
 fig.show()
 
