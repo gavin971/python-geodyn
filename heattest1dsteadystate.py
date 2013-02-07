@@ -53,8 +53,8 @@ for k in [0.5, 1.5, 2.0]:
     #   sympy.integrate(sympy.integrate(-A/k, z) + c1, z) + c2
     #   => -A*z**2/(2*k) + c1*z + c2
     # c2 is the temperature at z=0, i.e. T_s.
-    # c1 is equal to the gradient at z=z_max, i.e. q_b/-k + A*z/k
-    T_a = -A/(2*k) * z**2 + (-q_b/k + A*z/k)*z + T_s
+    # c1 is equal to the gradient at z=z_max, i.e. q_b/-k + A*z_max/k
+    T_a = -A/(2*k) * z**2 + (-q_b/k + A*numpy.max(z)/k)*z + T_s
 
     # plot z and T
     ax.plot(T-273.15, z, '-', label='Finite difference, k=' + str(k))

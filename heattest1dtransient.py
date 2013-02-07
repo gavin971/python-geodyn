@@ -11,6 +11,7 @@ import matplotlib.pyplot
 # Init grids
 N = 100           # no of z-cells
 z_max = 100.0     # max depth of z
+#z_max = 10.0     # max depth of z
 dz = z_max/N     # cell width
 z = numpy.arange(N)*dz # cell depths [m]
 T = numpy.empty(N)     # cell temperatures [K]
@@ -31,6 +32,7 @@ dt_plot = 7.0*24.0*60.0*60.0 # time between plots [s]
 
 # Boundary conditions
 T0mean = 273.15 - 3.0 # mean temperature [K]
+#T0mean = 273.15 + 3.0 # mean temperature [K]
 T_s = T0mean    # surface temperature [K]
 deltaT = 12.0   # amplitude of surface temperature fluctuations [K]
 q_b = -0.065    # heat flux (neg. when upwards) [W/m^2]
