@@ -69,9 +69,15 @@ class mesh:
         meshobj.f = numpy.zeros((meshobj.N, 1))
         for element in meshobj.elements:
             element.loadandstiffness()
-            I = numpy.nonzero(meshobj.TOPO == element.index)
-            meshobj.K[I] += element.K_e()   # perhaps wrong
-            meshobj.f[I,0] += element.f_e() # probably wrong - just guessing
+            nodes = meshobj.TOPO[element.index,:]
+            #print(nodes)
+            #meshobj.K[meshobj.TOPO[element.index,:], meshobj.TOPO[element.index,:]] += element.K_e
+            meshobj.f[nodes] += element.f_e
+            i = 0
+            for j in nodes:
+                for k in nodes:
+                    meshobj.K[j,k] += element.K_e.reshape(1,element.K_e.size)[0][i]
+                    i += 1
 
 
     def ebc(meshobj, inodes, val):
@@ -193,7 +199,7 @@ class mesh:
             elementobj.gradlt3()
 
             # Get interpolation function values
-            h = elementobj.shplint3(g_i[:,0], g_i[:,1])
+            phi = elementobj.shplint3(g_i[:,0], g_i[:,1])
 
             # Find global gradients of the Jacobian (stored as elementobj.dphi_g)
             elementobj.gradg()
@@ -203,9 +209,9 @@ class mesh:
 
             # Loop over integration points
             for i in numpy.arange(N_ip):
+                
                 elementobj.K_e += g_i[i,2] * elementobj.k * numpy.dot(elementobj.dphi_l.T, elementobj.dphi_l * elementobj.detJ)    # eq. 38, K^e_i
-                #elementobj.f_e += g_i[i,2] * elementobj.A * elementobj.dphi_l.T * elementobj.detJ  # eq. 39, f^e_i
-                elementobj.f_e += g_i[i,2] * elementobj.A * numpy.dot(elementobj.dphi_l.T, elementobj.detJ)  # eq. 39, f^e_i
+                elementobj.f_e += g_i[i,2] * phi * elementobj.A * elementobj.detJ  # eq. 39, f^e_i
             
 
         # Integration point level
@@ -216,6 +222,6 @@ class mesh:
 
 
 testgrid = mesh()
-testgrid.randomRect(N=4)
+testgrid.randomRect(N=100)
 testgrid.findKf()
 #testgrid.plot()
