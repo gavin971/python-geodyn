@@ -8,11 +8,12 @@ import matplotlib.collections
 class mesh:
     """ Finite Element Method mesh class """
 
-    def __init__(meshobj, k = 1.5, A = 1.0e-6):
+    def __init__(meshobj, name="unnamed", k = 1.5, A = 1.0e-6):
         """ Class initializer
         @param k: Conductivity of each element (float)
         @param A: Source term for each element (float)
         """
+        meshobj.name = name
         meshobj.k = k
         meshobj.A = A
         meshobj.elements = []
@@ -91,6 +92,14 @@ class mesh:
             # Add element to mesh list of elements
             meshobj.elements.append(mesh.element(i, meshobj.TOPO[i,:], meshobj.COORD[meshobj.TOPO[i,:]], meshobj.k, meshobj.A))
 
+    def bnodes(meshobj):
+        """ Returns the node pairs located at the outer spatial boundaries """
+        return meshobj.tri.convex_hull
+
+    def ubnodes(meshobj):
+        """ Returns the nodes located at the upper boundary """
+        bnodes = meshobj.bnodes().flatten()
+        return bnodes[numpy.nonzero(meshobj.COORD[bnodes][1] > (meshobj.y_max - meshobj.y_min)*0.8 + meshobj.y_min)]
 
     def findKf(meshobj):
         """ Construct the global stiffness matrix K and load vector f 
@@ -112,8 +121,8 @@ class mesh:
 
     def ebc(meshobj, inodes, val):
         """ Enforce essential (Dirichlet) boundary condition on nodes with index i
-        @inodes: Node indexes to enforce the essential boundary condition on (int array)
-        @val: Value the nodes are fixed against (float)
+        @param inodes: Node indexes to enforce the essential boundary condition on (int array)
+        @param val: Value the nodes are fixed against (float array)
         Using algorithm displayed in fig. 5, p. 12.
         """
         meshobj.f -= val * meshobj.K[inodes,:]
@@ -122,17 +131,24 @@ class mesh:
         meshobj.K[:,inodes] = 0.0
         meshobj.K[inodes,inodes] = 1.0
 
-    def nbc(meshobj, bodes, val, N_ip = 1):
-        """ Enforce natural (Neumann) boundary condition """
+    def nbc(meshobj, inodes, val, N_ip = 1):
+        """ Enforce natural (Neumann) boundary condition 
+        @param inodes: Node pairs to enforce the natural boundary condition on (2 col. int array).
+                       Tip: The nodes in the perimeter can be found using:
+                        >>> inodes = meshobj.bnodes()
+
+        @param val: Flux value the nodes are fixed against (float array)
+        @param N_ip: Number of integration points to use (int)
+        """
 
         # Get nodes in the perimeter
-        bnodes = meshobj.tri.convex_hull # two-cols, ? rows
+        #bnodes = meshobj.tri.convex_hull # two-cols, ? rows
 
         # No. of line sections
-        nl = bnodes.shape[0]
+        nl = inodes.shape[0]
 
         # Value
-        val = numpy.ones(nl) * 0.065
+        #val = numpy.ones(nl) * 0.065
 
         # Gauss data
         gi = gauss1d(N_ip)
@@ -145,8 +161,6 @@ class mesh:
 
             for ip in numpy.arange(N_ip):
                 f[nodes] += gi[ip,1] * 0.5 * numpy.array((1.0+gi[ip,0], 1.0-gi[ip,0])) * val[i] * dl/2.0
-        
-
 
 
     def ss(meshobj):
@@ -327,8 +341,30 @@ def gauss1d(N_ip):
 
 
 
-testgrid = mesh()
-testgrid.randomRect(N=1000)
+# Create temperature mesh
+testgrid = mesh("Temperature")
+
+# Create nodes, and triangular elements from these nodes
+#testgrid.randomRect(N=1000)
+testgrid.randomRect(N=20)
+
+# Find the global stiffness matrix and global load vector (without BC's)
 testgrid.findKf()
+
+# Find the perimeter nodes
+bnodes = testgrid.bnodes()
+print(bnodes)
+print(testgrid.COORD[bnodes])
+
+# Find the upper boundary nodes
+ubnodes = testgrid.ubnodes()
+print(ubnodes)
+
+# Apply boundary conditions
+#testgrid.
+
+# Solve the system in the steady state
 testgrid.ss()
-testgrid.plot()
+
+# Plot the solution
+#testgrid.plot()
