@@ -5,6 +5,7 @@ import scipy.interpolate
 import matplotlib.pyplot
 import matplotlib.collections
 
+
 class mesh:
     """ Finite Element Method mesh class """
 
