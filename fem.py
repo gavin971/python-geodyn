@@ -54,7 +54,7 @@ class mesh:
         @param y_min: Lower boundary of node positions along y (float)
         @param y_max: Upper boundary of node positions along y (float)
         """
-        raise Exception("rect function not finished")
+        #raise Exception("rect function not finished")
 
         # Store parameters in object
         meshobj.x_min = x_min
@@ -67,10 +67,21 @@ class mesh:
         Ny = ((y_max-y_min) * Nx) / (x_max - x_min)
         nodes_y = numpy.linspace(y_min, y_max, Ny)
 
-        # Create grid
-        #meshobj.delaunay([meshobj.nodes[0], meshobj.nodes[1]])
+        meshobj.nodes = numpy.empty([Nx*Ny, 2])
 
-        #meshobj.N = Nx*Ny
+        # Create regular grid
+        for i in numpy.arange(Nx):
+            for j in numpy.arange(Ny):
+                meshobj.nodes[i*Nx + j, 0] = nodes_x[i]
+                meshobj.nodes[i*Nx + j, 1] = nodes_y[j]
+
+        # Add some randomness
+        meshobj.nodes += numpy.random.rand(Nx*Ny, 2) * (x_max-x_min)*0.01
+        
+        # Create grid
+        meshobj.delaunay(meshobj.nodes)
+
+        meshobj.N = Nx*Ny
 
     def delaunay(meshobj, nodes):
         """ Perform a Delaunay triangulation with the nodes as triangle corners """
@@ -97,10 +108,26 @@ class mesh:
         """ Returns the node pairs located at the outer spatial boundaries """
         return meshobj.tri.convex_hull
 
-    def ubnodes(meshobj):
-        """ Returns the nodes located at the upper boundary """
+    def ubnodes(meshobj, limit = 0.8):
+        """ Returns the nodes located at the upper boundary 
+        @param limit: The fraction of the y-domain the nodes should be larger than (float)
+        """
         bnodes = meshobj.bnodes().flatten()
-        return bnodes[numpy.nonzero(meshobj.COORD[bnodes][1] > (meshobj.y_max - meshobj.y_min)*0.8 + meshobj.y_min)]
+        return bnodes[numpy.nonzero(meshobj.COORD[bnodes,1] > (meshobj.y_max - meshobj.y_min)*limit + meshobj.y_min)]
+
+    def lbnodes(meshobj, limit = 0.2, format = 'nodepairs'):
+        """ Returns the nodes located at the upper boundary 
+        @param limit: The fraction of the y-domain the nodes should be smaller than (float)
+        """
+        ylimit = (meshobj.y_max - meshobj.y_min)*limit + meshobj.y_min
+
+        if (format == 'flat'):
+            bnodes = meshobj.bnodes().flatten()
+            return bnodes[numpy.nonzero(meshobj.COORD[bnodes,1] < ylimit)]
+        elif (format == 'nodepairs'):
+            bnodes = meshobj.bnodes()
+            return bnodes[numpy.nonzero( (meshobj.COORD[bnodes[:,0],1] < ylimit) & (meshobj.COORD[bnodes[:,1],1] < ylimit) )]
+
 
     def findKf(meshobj):
         """ Construct the global stiffness matrix K and load vector f 
@@ -112,11 +139,11 @@ class mesh:
             nodes = meshobj.TOPO[element.index,:]
             #print(nodes)
             #meshobj.K[meshobj.TOPO[element.index,:], meshobj.TOPO[element.index,:]] += element.K_e
-            meshobj.f[nodes] += element.f_e
+            meshobj.f[nodes] = meshobj.f[nodes] + element.f_e
             i = 0
             for j in nodes:
                 for k in nodes:
-                    meshobj.K[j,k] += element.K_e.reshape(1,element.K_e.size)[0][i]
+                    meshobj.K[j,k] = meshobj.K[j,k] + element.K_e.reshape(1,element.K_e.size)[0][i]
                     i += 1
 
 
@@ -126,11 +153,14 @@ class mesh:
         @param val: Value the nodes are fixed against (float array)
         Using algorithm displayed in fig. 5, p. 12.
         """
-        meshobj.f -= val * meshobj.K[inodes,:]
-        meshobj.f[inodes] = val
-        meshobj.K[inodes,:] = 0.0
-        meshobj.K[:,inodes] = 0.0
-        meshobj.K[inodes,inodes] = 1.0
+        for j in inodes:
+            Kj = numpy.array(meshobj.K[:,j])
+            meshobj.f = meshobj.f - meshobj.K[:,j].reshape(meshobj.f.size, 1)
+            meshobj.f[j] = val
+            meshobj.K[:,j] = 0.0
+            meshobj.K[j,:] = 0.0
+            meshobj.K[j,j] = 1.0
+
 
     def nbc(meshobj, inodes, val, N_ip = 1):
         """ Enforce natural (Neumann) boundary condition 
@@ -138,12 +168,9 @@ class mesh:
                        Tip: The nodes in the perimeter can be found using:
                         >>> inodes = meshobj.bnodes()
 
-        @param val: Flux value the nodes are fixed against (float array)
+        @param val: Flux value the nodes are fixed against (float)
         @param N_ip: Number of integration points to use (int)
         """
-
-        # Get nodes in the perimeter
-        #bnodes = meshobj.tri.convex_hull # two-cols, ? rows
 
         # No. of line sections
         nl = inodes.shape[0]
@@ -155,21 +182,21 @@ class mesh:
         gi = gauss1d(N_ip)
 
         for i in numpy.arange(nl):
-            nodes = bnodes[i]
-            coords = self.COORD[nodes]
-            dist = coords[1] - coords[0]
+            nodes = inodes[i]
+            coords = meshobj.COORD[nodes]
+            dist = coords[1,:] - coords[0,:]
             dl = numpy.sqrt(dist.dot(dist))
 
             for ip in numpy.arange(N_ip):
-                f[nodes] += gi[ip,1] * 0.5 * numpy.array((1.0+gi[ip,0], 1.0-gi[ip,0])) * val[i] * dl/2.0
+                meshobj.f[nodes] = meshobj.f[nodes] + gi[ip,1] * 0.5 * numpy.array([ [1.0+gi[ip,0]], [1.0-gi[ip,0]] ]) * val * dl/2.0
 
 
-    def ss(meshobj):
+    def steadystate(meshobj):
         """ Solve the system in the steady state """
         meshobj.T = numpy.dot(numpy.linalg.inv(meshobj.K), meshobj.f)
         
 
-    def plot(meshobj):
+    def plot(meshobj, resolution = 100):
         """ Plot the mesh nodes and element borders """
 
         edge_points = []
@@ -192,21 +219,23 @@ class mesh:
 
         lines = matplotlib.collections.LineCollection(edge_points)
         matplotlib.pyplot.hold(1)
-        grid_x, grid_y = numpy.mgrid[meshobj.x_min:meshobj.x_max:100j, meshobj.y_min:meshobj.y_max:100j]
-        #x = meshobj.COORD[:,0]
-        #y = meshobj.COORD[:,1]
-        #X,Y = numpy.meshgrid(x,y)
-        meshobj.grid_T = scipy.interpolate.griddata(meshobj.COORD, meshobj.T, (grid_x, grid_y), method='cubic')
-        #matplotlib.pyplot.contourf(grid_x, grid_y, grid_T, 8, alpha=.75, cmap='jet')
-        print(meshobj.grid_T.shape)
-        #matplotlib.pyplot.imshow(meshobj.grid_T.T, extent=(0,1,0,1), origin='lower')
+        x_low = meshobj.COORD[:,0].min()
+        x_high = meshobj.COORD[:,0].max()
+        y_low = meshobj.COORD[:,1].min()
+        y_high = meshobj.COORD[:,1].max()
+        X, Y = numpy.meshgrid(numpy.linspace(x_low, x_high, resolution), numpy.linspace(y_low, y_high, resolution))
+        T = scipy.interpolate.griddata(meshobj.COORD, meshobj.T, (X, Y))[:,:,0]
+        #matplotlib.pyplot.imshow(T[:,:,0])
+        matplotlib.pyplot.contourf(X, Y, T, 8, alpha=.75, cmap='jet')
         matplotlib.pyplot.plot(meshobj.COORD[:,0], meshobj.COORD[:,1], 'ko')
-        #matplotlib.pyplot.plot(meshobj.COORD[meshobj.tri.convex_hull,0], meshobj.COORD[meshobj.tri.convex_hull,1], 'ko')
+        matplotlib.pyplot.plot(meshobj.COORD[meshobj.tri.convex_hull,0], meshobj.COORD[meshobj.tri.convex_hull,1], 'wo')
         matplotlib.pyplot.gca().add_collection(lines)
         matplotlib.pyplot.axis('equal')
-        #matplotlib.pyplot.colorbar()
+        matplotlib.pyplot.colorbar()
         matplotlib.pyplot.xlim(meshobj.x_min, meshobj.x_max)
         matplotlib.pyplot.ylim(meshobj.y_min, meshobj.y_max)
+        matplotlib.pyplot.xlabel('x')
+        matplotlib.pyplot.ylabel('y')
         matplotlib.pyplot.show()
 
 
@@ -223,7 +252,6 @@ class mesh:
             elementobj.coord = coord
             elementobj.k = k
             elementobj.A = A
-
 
         def gradlt3(elementobj):
             """ Sets the local gradient matrix (eq. 23) """
@@ -347,25 +375,20 @@ testgrid = mesh("Temperature")
 
 # Create nodes, and triangular elements from these nodes
 #testgrid.randomRect(N=1000)
-testgrid.randomRect(N=20)
+#testgrid.randomRect(N=7)
+testgrid.rect(Nx=40)
 
 # Find the global stiffness matrix and global load vector (without BC's)
 testgrid.findKf()
 
-# Find the perimeter nodes
-bnodes = testgrid.bnodes()
-print(bnodes)
-print(testgrid.COORD[bnodes])
+# Apply the essential boundary condition (fixed T) to the nodes at the upper boundary
+testgrid.ebc(testgrid.ubnodes(), val = 3.0)
 
-# Find the upper boundary nodes
-ubnodes = testgrid.ubnodes()
-print(ubnodes)
-
-# Apply boundary conditions
-#testgrid.
+# Apply the natural boundary condition (fixed q) to the nodes at the lower boundary
+testgrid.nbc(testgrid.lbnodes(), val = -0.065)
 
 # Solve the system in the steady state
-testgrid.ss()
+testgrid.steadystate()
 
 # Plot the solution
-#testgrid.plot()
+testgrid.plot()
