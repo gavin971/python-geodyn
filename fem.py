@@ -4,6 +4,7 @@ import scipy.spatial
 import scipy.interpolate
 import matplotlib.pyplot
 import matplotlib.collections
+import meshpy.triangle  # Install using `sudo pip install meshpy`
 
 
 class mesh:
@@ -75,13 +76,20 @@ class mesh:
                 meshobj.nodes[i*Nx + j, 0] = nodes_x[i]
                 meshobj.nodes[i*Nx + j, 1] = nodes_y[j]
 
-        # Add some randomness
-        meshobj.nodes += numpy.random.rand(Nx*Ny, 2) * (x_max-x_min)*0.01
+        # Add some randomness to all but the boundary nodes
+        I = numpy.nonzero( 
+                (meshobj.nodes[:,0] > x_min) &
+                (meshobj.nodes[:,0] < x_max) &
+                (meshobj.nodes[:,1] > y_min) &
+                (meshobj.nodes[:,1] < y_max) )
+
+        meshobj.nodes[I,:] += numpy.random.rand(len(I), 2) * (x_max-x_min)*0.01
         
         # Create grid
         meshobj.delaunay(meshobj.nodes)
 
         meshobj.N = Nx*Ny
+
 
     def delaunay(meshobj, nodes):
         """ Perform a Delaunay triangulation with the nodes as triangle corners """
@@ -104,15 +112,68 @@ class mesh:
             # Add element to mesh list of elements
             meshobj.elements.append(mesh.element(i, meshobj.TOPO[i,:], meshobj.COORD[meshobj.TOPO[i,:]], meshobj.k, meshobj.A))
 
+    def rectmeshpy(meshobj, bnodes, sides, verbose=True):
+        """ Use meshpy to generate a triangluar grid in a rectangular domain
+        @param bnodes: Coordinates of boundary nodes (2xN float array)
+        @param sides: node pair of sides (int array)
+        """
+        mesh_info = meshpy.triangle.MeshInfo()
+        #mesh_info.set_points([
+        #    (x_min,y_min), (x_max,y_min), (x_max,y_max), (x_min,y_max)
+        #    ])
+        mesh_info.set_points(bnodes)
+        #mesh_info.set_facets([
+        #    [0,1], [1,2], [2,3], [3,0],
+        #    ])
+        mesh_info.set_facets(sides)
+        mesh = meshpy.triangle.build(mesh_info)
+         
+        meshobj.N = len(mesh.points) 
+        meshobj.N_e = len(mesh.elements) 
+        meshobj.bnodes_ = bnodes
+        
+        if (verbose == True):
+            print("Mesh points:")
+            for i, p in enumerate(mesh.points):
+                print i, p
+            print("Point numbers in triangles:")
+            for i, t in enumerate(mesh.elements):
+                print i, t
+
+            print("Generated N = " + str(meshobj.N) + " nodes and N_e = " + str(meshobj.N_e) + " elements")
+
+        meshobj.COORD = numpy.empty([meshobj.N, 2])
+        meshobj.TOPO = numpy.empty([meshobj.N_e, 3])
+
+        #print(numpy.min(bnodes[:,0]))
+        meshobj.x_min = numpy.min(meshobj.COORD[:,0])
+        meshobj.x_max = numpy.max(meshobj.COORD[:,0])
+        meshobj.y_min = numpy.min(meshobj.COORD[:,1])
+        meshobj.y_max = numpy.max(meshobj.COORD[:,1])
+
+        for i,p in enumerate(mesh.points):
+            meshobj.COORD[i,:] = p
+        for i,t in enumerate(mesh.elements):
+            meshobj.TOPO[i,:] = t
+
+
     def bnodes(meshobj):
         """ Returns the node pairs located at the outer spatial boundaries """
-        return meshobj.tri.convex_hull
+        if hasattr(meshobj, 'tri'):
+            return meshobj.tri.convex_hull
+        else :
+            return meshobj.bnodes_
+
 
     def ubnodes(meshobj, limit = 0.8):
         """ Returns the nodes located at the upper boundary 
         @param limit: The fraction of the y-domain the nodes should be larger than (float)
         """
-        bnodes = meshobj.bnodes().flatten()
+        if hasattr(meshobj, 'tri'):
+            bnodes = meshobj.bnodes().flatten()
+        else :
+            bnodes = meshobj.bnodes_
+
         return bnodes[numpy.nonzero(meshobj.COORD[bnodes,1] > (meshobj.y_max - meshobj.y_min)*limit + meshobj.y_min)]
 
     def lbnodes(meshobj, limit = 0.2, format = 'nodepairs'):
@@ -376,7 +437,14 @@ testgrid = mesh("Temperature")
 # Create nodes, and triangular elements from these nodes
 #testgrid.randomRect(N=1000)
 #testgrid.randomRect(N=7)
-testgrid.rect(Nx=40)
+#testgrid.rect(Nx=11)
+x_min = 0.0
+x_max = 1.0
+y_min = 0.0
+y_max = 1.0
+bnodes = [(x_min,y_min), (x_max,y_min), (x_max,y_max), (x_min,y_max),]
+sides = [[0,1], [1,2], [2,3], [3,0],]
+testgrid.rectmeshpy(bnodes, sides)
 
 # Find the global stiffness matrix and global load vector (without BC's)
 testgrid.findKf()
