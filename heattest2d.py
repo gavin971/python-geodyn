@@ -12,9 +12,9 @@ world = geodyn.world()
 # Add random values to topography
 #world.topography.addGauss(mu = 0.0, sigma = 5.0)
 
-# Add a center layer of ice
+# Add a center area of higher temperatures
 world.heat = geodyn.grid.twoDimensional.uniformCubic(world, title = "Temperature")
-world.heat.grid[8:13, 8:13] = 20.0
+world.heat.grid[24:48, 50:100] = 20.0
 world.materials.layer1 = world.material()
 
 # Plot topography
