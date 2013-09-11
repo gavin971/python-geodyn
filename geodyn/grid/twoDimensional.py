@@ -50,7 +50,7 @@ class uniformCubic:
         matplotlib.pyplot.colorbar()
         matplotlib.pyplot.title(self.title + ", t = {} s".format(time))
         if (save == True):
-            fig.savefig(self.title + "_t={:10}s.png".format(time))
+            fig.savefig(self.title + "_t={0:010}s.png".format(time))
             fig.clf()
         else :
             fig.show()
