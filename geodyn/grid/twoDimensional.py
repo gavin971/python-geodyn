@@ -28,7 +28,7 @@ class uniformCubic:
                      * numpy.random.randn(self.grid.shape[0], self.grid.shape[1]) \
                      + mu
 
-                    
+
 
     def coordinates(self, ix, iy):
         """
@@ -50,7 +50,7 @@ class uniformCubic:
         matplotlib.pyplot.colorbar()
         matplotlib.pyplot.title(self.title + ", t = {} s".format(time))
         if (save == True):
-            fig.savefig(self.title + "_t={}s.png".format(time))
+            fig.savefig(self.title + "_t={:10}s.png".format(time))
             fig.clf()
         else :
             fig.show()

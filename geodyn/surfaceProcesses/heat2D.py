@@ -7,7 +7,7 @@ def explTimeStep(T, material, dt = "max", f = 0.0):
     boundary values to solve the diffusion equation.
     @param T: Object of grid class
     @param material: Object of material class
-    @param dt: Time step length, [s]. If "max", the function will 
+    @param dt: Time step length, [s]. If "max", the function will
     determine the max. stable value, and return it.
     @param f: Local heat production, [W]. Can be a scalar or ndarray
     in the same dimensions as T.
@@ -45,8 +45,8 @@ def explTimeStep(T, material, dt = "max", f = 0.0):
         dt = dt_max
         returndt = True
     elif (dt > dt_max):
-        raise ValueError("Time step length (dt = {} s) is larger" \
-                + " than the max. stable length (dt_max = {} s)"\
+        raise ValueError("Time step length (dt = {} s) is larger"
+                + " than the max. stable length (dt_max = {} s)"
                 .format(dt, dt_max))
 
     # Explicit 2D finite difference scheme
